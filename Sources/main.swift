@@ -99,7 +99,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var menu: NSMenu!
     private var lastScrollAt: TimeInterval = 0
     private let scrollCooldown: TimeInterval = 0.4
-    private let maxLength = 60
+    private let maxLength = 45        // total cap for "Title — Artist"
+    private let maxArtistLength = 25  // artist trims past this
+    private let minTitleLength = 10   // title gets at least this many chars
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -218,11 +220,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let symbolName: String
         if let info = info, let title = info.title, !title.isEmpty {
             symbolName = info.playing ? "play.fill" : "pause.fill"
-            if let artist = info.artist, !artist.isEmpty {
-                display = "\(title) — \(artist)"
-            } else {
-                display = title
-            }
+            display = format(title: title, artist: info.artist)
         } else {
             symbolName = "waveform"
             display = ""
@@ -236,14 +234,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             // Prefix a space so the title doesn't sit flush against the icon.
             // (NSStatusBarButton has no imagePadding property.)
-            let truncated = truncate(display)
-            button.title = truncated.isEmpty ? "" : " " + truncated
+            button.title = display.isEmpty ? "" : " " + display
         }
     }
 
-    private func truncate(_ s: String) -> String {
-        guard s.count > maxLength else { return s }
-        return String(s.prefix(maxLength - 1)) + "…"
+    /// Compose a "Title — Artist" string that fits within maxLength characters,
+    /// preferring to truncate the title rather than the artist.
+    private func format(title: String, artist: String?) -> String {
+        guard let artist = artist, !artist.isEmpty else {
+            return shorten(title, to: maxLength)
+        }
+        let artistShort = shorten(artist, to: maxArtistLength)
+        let separator = " — "
+        let artistSegment = separator + artistShort
+        let availableForTitle = max(minTitleLength, maxLength - artistSegment.count)
+        return shorten(title, to: availableForTitle) + artistSegment
+    }
+
+    private func shorten(_ s: String, to limit: Int) -> String {
+        guard s.count > limit else { return s }
+        return String(s.prefix(max(1, limit - 1))) + "…"
     }
 
     @objc private func quit() {
