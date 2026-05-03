@@ -18,6 +18,11 @@ typedef void (*RegisterFn)(dispatch_queue_t);
 typedef void (*SetCanBeFn)(Boolean);
 typedef void (*GetIsPlayingFn)(dispatch_queue_t, void (^)(Boolean));
 
+// Note: MRMediaRemoteSendCommand is restricted on macOS 15.4+ even when
+// called via the perl + dylib trick — the system silently drops the command.
+// We use synthetic media keys (NSEvent.systemDefined) on the Swift side
+// instead. See main.swift.
+
 static void writeJSON(NSDictionary *obj) {
     NSData *data = [NSJSONSerialization dataWithJSONObject:obj options:0 error:nil];
     if (data) {

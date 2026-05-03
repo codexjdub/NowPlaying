@@ -30,12 +30,21 @@ swiftc -O \
 
 cp Resources/Info.plist "${BUILD_DIR}/${APP_BUNDLE}/Contents/Info.plist"
 
-# Strip xattrs that codesign rejects (e.g. com.apple.provenance from iCloud sync)
-xattr -cr "${BUILD_DIR}/${APP_BUNDLE}"
-
-# Ad-hoc sign so macOS lets us launch it
-codesign --force --sign - "${RES_DIR}/MediaRemoteAdapter.dylib"
-codesign --force --deep --sign - "${BUILD_DIR}/${APP_BUNDLE}"
+# Strip xattrs and ad-hoc sign. iCloud Drive races us by re-adding FinderInfo
+# to the bundle, so retry a few times until codesign succeeds.
+for attempt in 1 2 3 4 5; do
+    xattr -cr "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
+    xattr -d com.apple.FinderInfo "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
+    dot_clean -m "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
+    if codesign --force --deep --sign "dj" "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null; then
+        break
+    fi
+    if [[ $attempt -eq 5 ]]; then
+        echo "codesign failed after 5 attempts" >&2
+        exit 1
+    fi
+    sleep 0.3
+done
 
 echo "Built ${BUILD_DIR}/${APP_BUNDLE}"
 echo "Run with: open ${BUILD_DIR}/${APP_BUNDLE}"
