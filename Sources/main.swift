@@ -147,7 +147,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        timer = Timer.scheduledTimer(withTimeInterval: 4.0, repeats: true) { [weak self] _ in
             self?.refresh()
         }
     }

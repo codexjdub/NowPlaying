@@ -73,6 +73,6 @@ This approach is intentionally small and local, but it depends on private macOS 
 
 ## Current Limitations
 
-- Metadata refreshes by polling every 2 seconds (with an immediate refresh after any user-issued command).
+- Metadata refreshes by polling every 4 seconds (with an immediate refresh after any user-issued command, so clicks and scroll feel instant).
 - The title shown is whatever the source app publishes to MediaRemote. Some apps (notably YouTube Music in browsers) publish only the romanized/English form of bilingual titles, so the original-script title may not appear.
 - The app uses private MediaRemote APIs and synthetic media keys, so compatibility is not guaranteed across all macOS versions.
