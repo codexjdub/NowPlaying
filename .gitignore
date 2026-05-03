@@ -1,0 +1,10 @@
+build/
+.DS_Store
+
+# Agent / task files (not committed)
+AGENTS.md
+CLAUDE.md
+TODO.md
+
+# Local Claude Code config
+.claude/settings.local.json
