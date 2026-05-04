@@ -10,8 +10,9 @@ It shows the current title and artist in the system status bar, updates the icon
 - Hover for a tooltip with the full untruncated title, artist, and album
 - Custom macOS app icon for Finder, launch prompts, and system permission dialogs
 - Playback-state icons: `play.fill` while playing, `pause.fill` while paused, and `waveform` when idle
+- Optional source-app icon in the menu bar when the current player can be identified
 - Left-click to toggle play/pause
-- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Copy, Open at Login, Refresh, and Quit
+- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Copy, Show Source App Icon, Open at Login, Refresh, and Quit
 - Scroll over the menu bar item to change tracks: up for next, down for previous
 - Copy the current `Title — Artist` to the clipboard from the menu (or ⌘C while the menu is open)
 - Optional "Open at Login" toggle so the app starts with macOS
@@ -41,6 +42,7 @@ After launch, the app appears only in the menu bar. It does not show a Dock icon
 - **Scroll down over the item:** previous track
 - **Hover (≈2 s):** tooltip with full title, artist, and album
 - **Copy menu item (or ⌘C):** put the current `Title — Artist` on the clipboard
+- **Show Source App Icon menu item:** switch between generic playback-state symbols and the current player's app icon
 - **Open at Login menu item:** toggle whether the app starts automatically at login (macOS 13+)
 - **Refresh menu item:** manually reload current metadata
 - **Quit menu item:** exit the app
@@ -85,7 +87,7 @@ The Swift app owns the menu bar UI and periodically asks a small adapter for now
 
 The perl-loader path is used because recent macOS versions restrict direct third-party calls to `MRMediaRemoteGetNowPlayingInfo`. Apple-signed `/usr/bin/perl` still has the required access, and the adapter runs in that process.
 
-The now-playing metadata approach was inspired by [kirtan-shah/nowplaying-cli](https://github.com/kirtan-shah/nowplaying-cli). This repo includes a minimal reimplementation tailored for the app, exposing title, artist, album, and playing state through a single `adapter_get` function.
+The now-playing metadata approach was inspired by [kirtan-shah/nowplaying-cli](https://github.com/kirtan-shah/nowplaying-cli). This repo includes a minimal reimplementation tailored for the app, exposing title, artist, album, source app bundle identifier, and playing state through a single `adapter_get` function.
 
 Playback controls use a separate path. `MRMediaRemoteSendCommand` is more restricted on recent macOS versions, so Now Playing posts synthetic hardware media-key events with `NSEvent.systemDefined` and `CGEvent.post`.
 

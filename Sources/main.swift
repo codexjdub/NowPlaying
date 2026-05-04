@@ -46,7 +46,13 @@ struct NowPlayingInfo {
     let title: String?
     let artist: String?
     let album: String?
+    let bundleIdentifier: String?
     let playing: Bool
+}
+
+private struct SourceAppInfo {
+    let name: String
+    let icon: NSImage
 }
 
 final class NowPlayingClient {
@@ -95,9 +101,10 @@ final class NowPlayingClient {
         }
 
         return NowPlayingInfo(
-            title:   dict["title"]   as? String,
-            artist:  dict["artist"]  as? String,
-            album:   dict["album"]   as? String,
+            title:            dict["title"]            as? String,
+            artist:           dict["artist"]           as? String,
+            album:            dict["album"]            as? String,
+            bundleIdentifier: dict["bundleIdentifier"] as? String,
             playing: (dict["playing"] as? Bool) ?? false
         )
     }
@@ -112,13 +119,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var versionItem: NSMenuItem!
     private var accessibilityItem: NSMenuItem!
     private var copyItem: NSMenuItem!
+    private var showSourceAppIconItem: NSMenuItem!
     private var launchAtLoginItem: NSMenuItem?
     private var lastInfo: NowPlayingInfo?
     private var lastScrollAt: TimeInterval = 0
+    private var currentIconKey: String?
+    private var sourceAppCache: [String: SourceAppInfo] = [:]
+    private var unresolvedSourceApps = Set<String>()
     private let scrollCooldown: TimeInterval = 0.4
     private let maxLength = 45        // total cap for "Title — Artist"
     private let maxArtistLength = 25  // artist trims past this
     private let minTitleLength = 10   // title gets at least this many chars
+    private let showSourceAppIconKey = "showSourceAppIcon"
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -161,6 +173,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         copyItem = NSMenuItem(title: "Copy", action: #selector(copyTrackInfo), keyEquivalent: "c")
         copyItem.target = self
         menu.addItem(copyItem)
+        menu.addItem(NSMenuItem.separator())
+
+        showSourceAppIconItem = NSMenuItem(title: "Show Source App Icon", action: #selector(toggleShowSourceAppIcon), keyEquivalent: "")
+        showSourceAppIconItem.target = self
+        menu.addItem(showSourceAppIconItem)
         menu.addItem(NSMenuItem.separator())
 
         if #available(macOS 13.0, *) {
@@ -261,10 +278,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let display: String
         let symbolName: String
         let tooltip: String?
+        var sourceApp: SourceAppInfo?
         if let info = info, let title = info.title, !title.isEmpty {
             symbolName = info.playing ? "play.fill" : "pause.fill"
             display = format(title: title, artist: info.artist)
-            tooltip = buildTooltip(title: title, artist: info.artist, album: info.album)
+            if showSourceAppIcon {
+                sourceApp = sourceAppInfo(for: info.bundleIdentifier)
+            }
+            tooltip = buildTooltip(
+                title: title,
+                artist: info.artist,
+                album: info.album,
+                sourceName: sourceApp?.name,
+                playing: info.playing
+            )
         } else {
             symbolName = "waveform"
             display = ""
@@ -272,10 +299,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         if let button = statusItem.button {
-            if button.image?.accessibilityDescription != symbolName {
-                let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: symbolName)
-                icon?.isTemplate = true
-                button.image = icon
+            if let sourceApp = sourceApp, let bundleIdentifier = info?.bundleIdentifier {
+                setStatusIcon(sourceApp.icon, key: "app:\(bundleIdentifier)")
+            } else {
+                setStatusSymbol(symbolName)
             }
             // Prefix a space so the title doesn't sit flush against the icon.
             // (NSStatusBarButton has no imagePadding property.)
@@ -284,17 +311,68 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    private var showSourceAppIcon: Bool {
+        get { UserDefaults.standard.bool(forKey: showSourceAppIconKey) }
+        set { UserDefaults.standard.set(newValue, forKey: showSourceAppIconKey) }
+    }
+
+    private func setStatusSymbol(_ symbolName: String) {
+        let key = "symbol:\(symbolName)"
+        guard currentIconKey != key else { return }
+        let icon = NSImage(systemSymbolName: symbolName, accessibilityDescription: symbolName)
+        icon?.isTemplate = true
+        statusItem.button?.image = icon
+        currentIconKey = key
+    }
+
+    private func setStatusIcon(_ icon: NSImage, key: String) {
+        guard currentIconKey != key else { return }
+        statusItem.button?.image = icon
+        currentIconKey = key
+    }
+
+    private func sourceAppInfo(for bundleIdentifier: String?) -> SourceAppInfo? {
+        guard let bundleIdentifier = bundleIdentifier, !bundleIdentifier.isEmpty else { return nil }
+        if let cached = sourceAppCache[bundleIdentifier] { return cached }
+        if unresolvedSourceApps.contains(bundleIdentifier) { return nil }
+
+        guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) else {
+            unresolvedSourceApps.insert(bundleIdentifier)
+            return nil
+        }
+
+        let bundle = Bundle(url: appURL)
+        let name = (bundle?.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String)
+            ?? (bundle?.object(forInfoDictionaryKey: "CFBundleName") as? String)
+            ?? FileManager.default.displayName(atPath: appURL.path)
+        let icon = (NSWorkspace.shared.icon(forFile: appURL.path).copy() as? NSImage)
+            ?? NSWorkspace.shared.icon(forFile: appURL.path)
+        icon.size = NSSize(width: 18, height: 18)
+        icon.isTemplate = false
+        icon.accessibilityDescription = name
+
+        let info = SourceAppInfo(name: name, icon: icon)
+        sourceAppCache[bundleIdentifier] = info
+        return info
+    }
+
     /// Build the hover tooltip: full untruncated `Title — Artist` on the first
-    /// line, and `Album` on the second line if available.
-    private func buildTooltip(title: String, artist: String?, album: String?) -> String {
+    /// line, `Album` on the second line if available, and source state when
+    /// a source app icon is shown.
+    private func buildTooltip(title: String, artist: String?, album: String?, sourceName: String?, playing: Bool) -> String {
         var line1 = title
         if let artist = artist, !artist.isEmpty {
             line1 += " — \(artist)"
         }
+        var lines = [line1]
         if let album = album, !album.isEmpty {
-            return line1 + "\n" + album
+            lines.append(album)
         }
-        return line1
+        if let sourceName = sourceName, !sourceName.isEmpty {
+            let state = playing ? "Playing" : "Paused"
+            lines.append("\(state) from \(sourceName)")
+        }
+        return lines.joined(separator: "\n")
     }
 
     /// Compose a "Title — Artist" string that fits within maxLength characters,
@@ -340,6 +418,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         if #available(macOS 13.0, *), let item = launchAtLoginItem {
             item.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
         }
+
+        showSourceAppIconItem.state = showSourceAppIcon ? .on : .off
     }
 
     // Disable the Copy item when there's nothing to copy.
@@ -366,6 +446,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(text, forType: .string)
+    }
+
+    @objc private func toggleShowSourceAppIcon() {
+        showSourceAppIcon.toggle()
+        showSourceAppIconItem.state = showSourceAppIcon ? .on : .off
+        update(with: lastInfo)
     }
 
     @available(macOS 13.0, *)

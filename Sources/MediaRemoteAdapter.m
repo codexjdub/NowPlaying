@@ -5,7 +5,7 @@
 //
 // Single export: adapter_get
 // Behavior: prints a single JSON object to stdout with keys
-//   { "title": ..., "artist": ..., "album": ..., "playing": bool }
+//   { "title": ..., "artist": ..., "album": ..., "bundleIdentifier": ..., "playing": bool }
 // All keys are optional; an empty object means nothing is playing.
 
 #import <Foundation/Foundation.h>
@@ -83,9 +83,11 @@ void adapter_get(void) {
             NSString *title  = info[@"kMRMediaRemoteNowPlayingInfoTitle"];
             NSString *artist = info[@"kMRMediaRemoteNowPlayingInfoArtist"];
             NSString *album  = info[@"kMRMediaRemoteNowPlayingInfoAlbum"];
+            NSString *bundleIdentifier = info[@"kMRMediaRemoteNowPlayingInfoClientBundleIdentifier"];
             if (title)  out[@"title"]  = title;
             if (artist) out[@"artist"] = artist;
             if (album)  out[@"album"]  = album;
+            if (bundleIdentifier) out[@"bundleIdentifier"] = bundleIdentifier;
         }
         out[@"playing"] = @(playing);
 
