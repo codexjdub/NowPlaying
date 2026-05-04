@@ -33,13 +33,25 @@ swiftc -O \
 
 cp Resources/Info.plist "${BUILD_DIR}/${APP_BUNDLE}/Contents/Info.plist"
 
-# Strip xattrs and ad-hoc sign. iCloud Drive races us by re-adding FinderInfo
+# Pick a code-signing identity. Defaults to "dj"; override with e.g.
+#   IDENTITY=MyDevCert ./build.sh
+# If the requested identity isn't in the keychain, fall back to ad-hoc
+# signing so a fresh clone still builds — at the cost of macOS re-prompting
+# for Accessibility permission after each rebuild.
+IDENTITY="${IDENTITY:-dj}"
+if ! security find-identity -v -p codesigning 2>/dev/null | grep -qE "\"${IDENTITY}\""; then
+    echo "Warning: code-signing identity '${IDENTITY}' not found in keychain; falling back to ad-hoc signing." >&2
+    echo "         (See README → 'Code signing for development' to make Accessibility permission persist.)" >&2
+    IDENTITY="-"
+fi
+
+# Strip xattrs and sign. iCloud Drive races us by re-adding FinderInfo
 # to the bundle, so retry a few times until codesign succeeds.
 for attempt in 1 2 3 4 5; do
     xattr -cr "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
     xattr -d com.apple.FinderInfo "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
     dot_clean -m "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null || true
-    if codesign --force --deep --sign "dj" "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null; then
+    if codesign --force --deep --sign "${IDENTITY}" "${BUILD_DIR}/${APP_BUNDLE}" 2>/dev/null; then
         break
     fi
     if [[ $attempt -eq 5 ]]; then

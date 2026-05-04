@@ -72,8 +72,19 @@ final class NowPlayingClient {
         task.standardOutput = stdoutPipe
         task.standardError = FileHandle(forWritingAtPath: "/dev/null")
 
+        // Wait with a 2 s deadline so a hung perl can't block the worker
+        // thread indefinitely (and pile up workers across polling ticks).
+        let sem = DispatchSemaphore(value: 0)
+        task.terminationHandler = { _ in sem.signal() }
+
         do { try task.run() } catch { return nil }
-        task.waitUntilExit()
+
+        if sem.wait(timeout: .now() + 2.0) == .timedOut {
+            task.terminate()
+            _ = sem.wait(timeout: .now() + 0.5) // give SIGTERM a moment to land
+            return nil
+        }
+
         guard task.terminationStatus == 0 else { return nil }
 
         let data = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
@@ -91,12 +102,14 @@ final class NowPlayingClient {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var client: NowPlayingClient?
     private var timer: Timer?
     private var scrollMonitor: Any?
     private var menu: NSMenu!
+    private var versionItem: NSMenuItem!
+    private var accessibilityItem: NSMenuItem!
     private var lastScrollAt: TimeInterval = 0
     private let scrollCooldown: TimeInterval = 0.4
     private let maxLength = 45        // total cap for "Title — Artist"
@@ -121,11 +134,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Build (but don't attach) the dropdown menu — we attach it on demand
         // for right-clicks, otherwise left-click would also pop the menu.
         menu = NSMenu()
+        menu.delegate = self
         let addItem: (String, Selector, String) -> Void = { [weak self] title, sel, key in
             let item = NSMenuItem(title: title, action: sel, keyEquivalent: key)
             item.target = self
             self?.menu.addItem(item)
         }
+
+        // Header: app version + Accessibility status. Both updated on menuWillOpen.
+        versionItem = NSMenuItem(title: "NowPlaying", action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        accessibilityItem = NSMenuItem(title: "Accessibility: …", action: nil, keyEquivalent: "")
+        menu.addItem(versionItem)
+        menu.addItem(accessibilityItem)
+        menu.addItem(NSMenuItem.separator())
+
         addItem("Play / Pause",   #selector(toggle),   "")
         addItem("Next Track",     #selector(next),     "")
         addItem("Previous Track", #selector(previous), "")
@@ -218,12 +241,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func update(with info: NowPlayingInfo?) {
         let display: String
         let symbolName: String
+        let tooltip: String?
         if let info = info, let title = info.title, !title.isEmpty {
             symbolName = info.playing ? "play.fill" : "pause.fill"
             display = format(title: title, artist: info.artist)
+            tooltip = buildTooltip(title: title, artist: info.artist, album: info.album)
         } else {
             symbolName = "waveform"
             display = ""
+            tooltip = nil
         }
 
         if let button = statusItem.button {
@@ -235,7 +261,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             // Prefix a space so the title doesn't sit flush against the icon.
             // (NSStatusBarButton has no imagePadding property.)
             button.title = display.isEmpty ? "" : " " + display
+            button.toolTip = tooltip
         }
+    }
+
+    /// Build the hover tooltip: full untruncated `Title — Artist` on the first
+    /// line, and `Album` on the second line if available.
+    private func buildTooltip(title: String, artist: String?, album: String?) -> String {
+        var line1 = title
+        if let artist = artist, !artist.isEmpty {
+            line1 += " — \(artist)"
+        }
+        if let album = album, !album.isEmpty {
+            return line1 + "\n" + album
+        }
+        return line1
     }
 
     /// Compose a "Title — Artist" string that fits within maxLength characters,
@@ -258,6 +298,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func quit() {
         NSApp.terminate(nil)
+    }
+
+    // Refresh the header items (version + Accessibility) right before the
+    // menu is shown, so the Accessibility line reflects current TCC state.
+    func menuWillOpen(_ menu: NSMenu) {
+        let version = (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "?"
+        versionItem.title = "NowPlaying \(version)"
+
+        let granted = AXIsProcessTrusted()
+        if granted {
+            accessibilityItem.title = "Accessibility: granted"
+            accessibilityItem.action = nil           // disabled / informational
+            accessibilityItem.target = nil
+        } else {
+            accessibilityItem.title = "Accessibility: denied — click to fix"
+            accessibilityItem.action = #selector(openAccessibilitySettings)
+            accessibilityItem.target = self
+        }
+    }
+
+    @objc private func openAccessibilitySettings() {
+        let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+        NSWorkspace.shared.open(url)
     }
 }
 

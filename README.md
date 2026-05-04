@@ -7,10 +7,11 @@ It shows the current title and artist in the system status bar, updates the icon
 ## Features
 
 - Menu bar display for the current track title and artist
+- Hover for a tooltip with the full untruncated title, artist, and album
 - Custom macOS app icon for Finder, launch prompts, and system permission dialogs
 - Playback-state icons: `play.fill` while playing, `pause.fill` while paused, and `waveform` when idle
 - Left-click to toggle play/pause
-- Right-click or Control-click for Play/Pause, Next Track, Previous Track, Refresh, and Quit
+- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Refresh, and Quit
 - Scroll over the menu bar item to change tracks: up for next, down for previous
 - Local-only operation: no accounts, servers, analytics, or network calls
 
@@ -36,8 +37,11 @@ After launch, the app appears only in the menu bar. It does not show a Dock icon
 - **Right-click or Control-click:** open the menu
 - **Scroll up over the item:** next track
 - **Scroll down over the item:** previous track
+- **Hover (≈2 s):** tooltip with full title, artist, and album
 - **Refresh menu item:** manually reload current metadata
 - **Quit menu item:** exit the app
+
+The menu also shows the running app version and the current Accessibility permission status. If permission is denied, clicking the status line opens System Settings directly to the right pane.
 
 ## Accessibility Permission
 
