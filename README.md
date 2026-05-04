@@ -12,7 +12,7 @@ It shows the current title and artist in the system status bar, updates the icon
 - Playback-state icons: `play.fill` while playing, `pause.fill` while paused, and `waveform` when idle
 - Optional source-app icon in the menu bar when the current player can be identified
 - Left-click to toggle play/pause
-- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Copy, Show Source App Icon, Open at Login, Refresh, and Quit
+- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Copy, Refresh, Show Source App Icon, Open at Login, and Quit
 - Scroll over the menu bar item to change tracks: up for next, down for previous
 - Copy the current `Title — Artist` to the clipboard from the menu (or ⌘C while the menu is open)
 - Optional "Open at Login" toggle so the app starts with macOS

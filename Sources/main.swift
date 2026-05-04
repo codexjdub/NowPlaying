@@ -173,23 +173,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         copyItem = NSMenuItem(title: "Copy", action: #selector(copyTrackInfo), keyEquivalent: "c")
         copyItem.target = self
         menu.addItem(copyItem)
+        addItem("Refresh", #selector(refresh), "r")
         menu.addItem(NSMenuItem.separator())
 
         showSourceAppIconItem = NSMenuItem(title: "Show Source App Icon", action: #selector(toggleShowSourceAppIcon), keyEquivalent: "")
         showSourceAppIconItem.target = self
         menu.addItem(showSourceAppIconItem)
-        menu.addItem(NSMenuItem.separator())
 
         if #available(macOS 13.0, *) {
             let item = NSMenuItem(title: "Open at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
             item.target = self
             launchAtLoginItem = item
             menu.addItem(item)
-            menu.addItem(NSMenuItem.separator())
         }
-
-        addItem("Refresh", #selector(refresh), "r")
         menu.addItem(NSMenuItem.separator())
+
         addItem("Quit", #selector(quit), "q")
 
         client = NowPlayingClient()
