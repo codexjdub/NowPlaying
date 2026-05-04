@@ -11,8 +11,10 @@ It shows the current title and artist in the system status bar, updates the icon
 - Custom macOS app icon for Finder, launch prompts, and system permission dialogs
 - Playback-state icons: `play.fill` while playing, `pause.fill` while paused, and `waveform` when idle
 - Left-click to toggle play/pause
-- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Refresh, and Quit
+- Right-click or Control-click for a dropdown menu with the app version, current Accessibility-permission status, and Play/Pause, Next Track, Previous Track, Copy, Open at Login, Refresh, and Quit
 - Scroll over the menu bar item to change tracks: up for next, down for previous
+- Copy the current `Title — Artist` to the clipboard from the menu (or ⌘C while the menu is open)
+- Optional "Open at Login" toggle so the app starts with macOS
 - Local-only operation: no accounts, servers, analytics, or network calls
 
 ## Requirements
@@ -38,6 +40,8 @@ After launch, the app appears only in the menu bar. It does not show a Dock icon
 - **Scroll up over the item:** next track
 - **Scroll down over the item:** previous track
 - **Hover (≈2 s):** tooltip with full title, artist, and album
+- **Copy menu item (or ⌘C):** put the current `Title — Artist` on the clipboard
+- **Open at Login menu item:** toggle whether the app starts automatically at login (macOS 13+)
 - **Refresh menu item:** manually reload current metadata
 - **Quit menu item:** exit the app
 

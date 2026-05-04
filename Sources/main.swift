@@ -1,6 +1,7 @@
 import Cocoa
 import Foundation
 import ApplicationServices
+import ServiceManagement
 
 // HID media-key codes (from IOKit/hidsystem/ev_keymap.h, NX_KEYTYPE_*).
 private enum MediaKey: Int {
@@ -110,6 +111,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var menu: NSMenu!
     private var versionItem: NSMenuItem!
     private var accessibilityItem: NSMenuItem!
+    private var copyItem: NSMenuItem!
+    private var launchAtLoginItem: NSMenuItem?
+    private var lastInfo: NowPlayingInfo?
     private var lastScrollAt: TimeInterval = 0
     private let scrollCooldown: TimeInterval = 0.4
     private let maxLength = 45        // total cap for "Title — Artist"
@@ -153,6 +157,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         addItem("Next Track",     #selector(next),     "")
         addItem("Previous Track", #selector(previous), "")
         menu.addItem(NSMenuItem.separator())
+
+        copyItem = NSMenuItem(title: "Copy", action: #selector(copyTrackInfo), keyEquivalent: "c")
+        copyItem.target = self
+        menu.addItem(copyItem)
+        menu.addItem(NSMenuItem.separator())
+
+        if #available(macOS 13.0, *) {
+            let item = NSMenuItem(title: "Open at Login", action: #selector(toggleLaunchAtLogin), keyEquivalent: "")
+            item.target = self
+            launchAtLoginItem = item
+            menu.addItem(item)
+            menu.addItem(NSMenuItem.separator())
+        }
+
         addItem("Refresh", #selector(refresh), "r")
         menu.addItem(NSMenuItem.separator())
         addItem("Quit", #selector(quit), "q")
@@ -239,6 +257,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func update(with info: NowPlayingInfo?) {
+        lastInfo = info
         let display: String
         let symbolName: String
         let tooltip: String?
@@ -316,11 +335,54 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             accessibilityItem.action = #selector(openAccessibilitySettings)
             accessibilityItem.target = self
         }
+
+        // Reflect current Login Items state.
+        if #available(macOS 13.0, *), let item = launchAtLoginItem {
+            item.state = (SMAppService.mainApp.status == .enabled) ? .on : .off
+        }
+    }
+
+    // Disable the Copy item when there's nothing to copy.
+    func validateMenuItem(_ item: NSMenuItem) -> Bool {
+        if item === copyItem {
+            return (lastInfo?.title?.isEmpty == false)
+        }
+        return true
     }
 
     @objc private func openAccessibilitySettings() {
         let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func copyTrackInfo() {
+        guard let info = lastInfo, let title = info.title, !title.isEmpty else { return }
+        let text: String
+        if let artist = info.artist, !artist.isEmpty {
+            text = "\(title) — \(artist)"
+        } else {
+            text = title
+        }
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(text, forType: .string)
+    }
+
+    @available(macOS 13.0, *)
+    @objc private func toggleLaunchAtLogin() {
+        let service = SMAppService.mainApp
+        do {
+            if service.status == .enabled {
+                try service.unregister()
+            } else {
+                try service.register()
+            }
+        } catch {
+            let alert = NSAlert()
+            alert.messageText = "Couldn't update Login Items"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+        }
     }
 }
 
