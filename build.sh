@@ -22,6 +22,9 @@ echo "Copying adapter.pl…"
 cp Resources/adapter.pl "${RES_DIR}/adapter.pl"
 chmod +x "${RES_DIR}/adapter.pl"
 
+echo "Copying AppIcon.icns…"
+cp Resources/AppIcon.icns "${RES_DIR}/AppIcon.icns"
+
 echo "Compiling Swift…"
 swiftc -O \
     -framework Cocoa \
